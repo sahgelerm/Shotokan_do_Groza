@@ -116,6 +116,10 @@ python src/train.py
 
 python src/inference.py
 
+Результат обучения 
+
+![result](results/CNN_model_training.png)
+
 Ключевые результаты:
 
 - Построена CNN модель для классификации стоек карате
