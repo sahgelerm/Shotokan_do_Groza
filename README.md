@@ -116,7 +116,10 @@ python src/train.py
 
 python src/inference.py
 
-Результат обучения 
+Результат обучения:
+
+Тестовая точность: 0.9714
+Тестовая потеря: 0.0838
 
 ![result](results/CNN_model_training.png)
 
