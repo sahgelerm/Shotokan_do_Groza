@@ -1,0 +1,7 @@
+src/
+│
+├── data_processing.py     # подготовка датасета
+├── model.py               # CNN модель
+├── train.py               # обучение
+├── inference.py           # предсказания
+└── utils.py               # вспомогательные функции
