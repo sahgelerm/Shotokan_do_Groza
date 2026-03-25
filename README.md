@@ -114,7 +114,7 @@ python src/train.py
 
 Запуск инференса:
 
-python src/predict.py
+python src/inference.py
 
 Ключевые результаты:
 
