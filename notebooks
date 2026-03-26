@@ -1,0 +1,253 @@
+# Стойки карате
+
+# загрузка библиотек
+# методы для отрисовки изображений
+from PIL import Image
+
+# Для отрисовки графиков
+import matplotlib.pyplot as plt
+
+# Для генерации случайных чисел
+import random
+
+# Библиотека работы с массивами
+import numpy as np
+
+# Для работы с файлами
+import os
+
+# импортируем модуль для загрузки данных
+import gdown
+
+# для разделения выборок
+from sklearn.model_selection import train_test_split
+
+# для создания сети
+from tensorflow.keras.models import Sequential
+
+# для создания слоев
+from tensorflow.keras.layers import Dense, Conv2D, MaxPooling2D, Flatten, Dropout, BatchNormalization
+
+# для работы с изображениями
+from tensorflow.keras.preprocessing import image
+
+# оптимизатор
+from tensorflow.keras.optimizers import Adam
+
+# модуль для отсчета времени
+import time
+
+# загрузка датасета
+from google.colab import files
+uploaded = files.upload()
+
+# распаковка архива
+import zipfile
+with zipfile.ZipFile('stances_5.zip', 'r') as zip_ref:
+       zip_ref.extractall('/content/')
+
+# задание пути
+IMAGE_PATH = '/content/stances_5/'
+
+# Получение списка папок, находящемуся по адресу в скобках
+os.listdir(IMAGE_PATH)
+
+# Определение списка имен классов
+CLASS_LIST = sorted(os.listdir(IMAGE_PATH))
+
+# Определение количества классов
+CLASS_COUNT = len(CLASS_LIST)
+
+# Проверка результата
+print(f'Количество классов: {CLASS_COUNT}, метки классов: {CLASS_LIST}')
+
+# Получения списка файлов для каждого класса
+for cls in CLASS_LIST:
+    print(cls, ':', os.listdir(f'{IMAGE_PATH}{cls}/'))
+
+# Создание заготовки для изображений всех классов
+fig, axs = plt.subplots(1, CLASS_COUNT, figsize=(10, 5))
+
+# Для всех номеров классов:
+for i in range(CLASS_COUNT):
+
+    # Формирование пути к папке содержимого класса
+    car_path = f'{IMAGE_PATH}{CLASS_LIST[i]}/'
+
+    # Выбор случайного фото из i-го класса
+    img_path = car_path + random.choice(os.listdir(car_path))
+
+    # Отображение фотографии (подробнее будет объяснено далее)
+    axs[i].set_title(CLASS_LIST[i])
+    axs[i].imshow(Image.open(img_path))
+    axs[i].axis('off')
+
+# Отрисовка всего полотна
+plt.show()
+
+data_files = []                           # Cписок путей к файлам картинок
+data_labels = []                          # Список меток классов, соответствующих файлам
+
+for class_label in range(CLASS_COUNT):    # Для всех классов по порядку номеров (их меток)
+    class_name = CLASS_LIST[class_label]  # Выборка имени класса из списка имен
+    class_path = IMAGE_PATH + class_name  # Формирование полного пути к папке с изображениями класса
+    class_files = os.listdir(class_path)  # Получение списка имен файлов с изображениями текущего класса
+    print(f'Размер класса {class_name} составляет {len(class_files)} фото')
+
+    # Добавление к общему списку всех файлов класса с добавлением родительского пути
+    data_files += [f'{class_path}/{file_name}' for file_name in class_files]
+
+    # Добавление к общему списку меток текущего класса - их ровно столько, сколько файлов в классе
+    data_labels += [class_label] * len(class_files)
+
+print()
+print('Общий размер базы для обучения:', len(data_labels))
+
+# Задание единых размеров изображений
+IMG_WIDTH = 128                           # Ширина изображения
+IMG_HEIGHT = 64                           # Высота изображения
+
+# перевод изображений в тензоры
+data_images = []                          # Пустой список для данных изображений
+
+for file_name in data_files:
+    # Открытие и смена размера изображения
+    img = Image.open(file_name).resize((IMG_WIDTH, IMG_HEIGHT))
+    img_np = np.array(img)                # Перевод в numpy-массив
+    data_images.append(img_np)            # Добавление изображения в виде numpy-массива к общему списку
+
+x_data = np.array(data_images)            # Перевод общего списка изображений в numpy-массив
+y_data = np.array(data_labels)            # Перевод общего списка меток класса в numpy-массив
+
+print(f'В массив собрано {len(data_images)} фотографий следующей формы: {img_np.shape}')
+print(f'Общий массив данных изображений следующей формы: {x_data.shape}')
+print(f'Общий массив меток классов следующей формы: {y_data.shape}')
+
+# вывод первого изображения (трехмерный тензор)
+x_data[0]
+
+# Создание модели последовательной архитектуры
+model = Sequential()
+
+# Первый сверточный блок
+model.add(Conv2D(256, (3, 3), name='First_C', padding='same', activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)))  # (64,128,3) --> (64,128,256) меняется кол-во фильтров
+model.add(BatchNormalization(name='First_B'))  # (64,128,256) --> (64,128,256) нет изменений
+
+# Второй сверточный блок
+model.add(Conv2D(256, (3, 3), name='Second_C', padding='same', activation='relu'))  # (64,128,256) --> (64,128,256) нет изменений
+model.add(MaxPooling2D(pool_size=(3, 3), name='Second_M'))  # сжимает размер в три раза, с потерей, т.к. padding='valid', глубина не изм. (64,128,256) --> (21,42,256)
+
+# Третий сверточный блок
+model.add(Conv2D(256, (3, 3), name='Third_C', padding='same', activation='relu'))  # (21,42,256) --> (21,42,256) нет изменений
+model.add(BatchNormalization(name='Third_B'))  # (21,42,256) --> (21,42,256) нет изменений
+model.add(Dropout(0.2, name='Third_D'))  # (21,42,256) --> (21,42,256) нет изменений
+
+# Четвертый сверточный блок
+model.add(Conv2D(256, (3, 3), name='Fourth_F_Unique', padding='same', activation='relu'))  # (21,42,256) --> (21,42,256) нет изменений
+model.add(MaxPooling2D(pool_size=(3, 3), name='Fourth_M_Unique'))  # сжимает размер в три раза, хотя padding='valid', потерь нет, т.к. делится кратно, глубина не изм. (21,42,256) --> (7,14,256)
+model.add(Dropout(0.2, name='Fourth_D_Unique'))  # (7,14,256) --> (7,14,256) нет изменений
+
+# Пятый сверточный блок
+model.add(Conv2D(512, (3, 3), name='Fifth_D', padding='same', activation='relu'))  # (7,14,256) --> (7,14,512) меняется количество фильтров
+model.add(BatchNormalization(name='Fifth_B'))  # (7,14,512) --> (7,14,512) нет изменений
+
+# Шестой сверточный блок
+model.add(Conv2D(1024, (3, 3), name='Sixth_C', padding='same', activation='relu'))  # (7,14,1024) --> (7,14,1024) меняется кол-во фильтров
+model.add(MaxPooling2D(pool_size=(3, 3), name='Sixth_M'))  # сжимает размер в три раза, с потерей, т.к. padding='valid', глубина не изм. (7,14,1024) --> (2,4,1024)
+model.add(Dropout(0.2, name='Sixth_D'))  # (2,4,1024) --> (2,4,1024) нет изменений
+
+# Блок классификации
+model.add(Flatten(name='Class_11'))  # слой преобразования многомерных данных в одномерные (2,4,1024) --> (2*4*1024) --> (8192)
+model.add(Dense(2048, activation='relu', name='Class_12'))  # полносвязный слой, меняется кол-во нейронов (8192) --> (2048)
+# model.add(Dense(4096, activation='relu', name='Class_3'))  # полносвязный слой, меняется кол-во нейронов (2048) --> (4096)
+model.add(Dense(CLASS_COUNT, activation='softmax', name='Class_13'))  # выходной полносвязный слой, кол-во нейронов = количество классов (4096) --> (3)
+
+model.summary()
+
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+from keras.optimizers import Adam
+from sklearn.model_selection import train_test_split
+
+# Компиляция модели
+model.compile(loss='sparse_categorical_crossentropy', optimizer=Adam(learning_rate=0.0001), metrics=['accuracy'])
+
+# Разделение данных на обучающую и тестовую выборки
+x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.2, random_state=42)
+
+# Определение колбэков
+model_checkpoint = ModelCheckpoint(filepath='model_best.h5', monitor='val_loss', save_best_only=True, verbose=1)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.6, patience=2, verbose=1)
+
+# Обучение модели и сохранение истории
+history = model.fit(x_train,  # Обучающая выборка
+                    y_train,  # Метки обучающей выборки
+                    validation_data=(x_test, y_test),  # Тестовая выборка для валидации
+                    shuffle=True,
+                    batch_size=25,
+                    epochs=35,
+                    verbose=1,
+                    callbacks=[model_checkpoint, reduce_lr])  # Добавление колбэков
+
+scores = model.evaluate(x_data,
+                        y_data,
+                        verbose=1
+                        )
+print('Процент верных ответов на тестовых данных:', round(scores[1],2) * 100, '%')
+
+# Оценка модели на тестовой выборке
+test_loss, test_accuracy = model.evaluate(x_test, y_test, verbose=1)
+
+print(f'Тестовая точность: {test_accuracy:.4f}')
+print(f'Тестовая потеря: {test_loss:.4f}')
+
+# Визуализация процесса обучения
+plt.figure(figsize=(12, 4))
+
+# График потерь
+plt.subplot(1, 2, 1)
+plt.plot(history.history['loss'], label='Обучающие потери')
+plt.plot(history.history['val_loss'], label='Валидационные потери')
+plt.title('Потери модели')
+plt.xlabel('Эпохи')
+plt.ylabel('Потери')
+plt.legend()
+
+# График точности
+plt.subplot(1, 2, 2)
+plt.plot(history.history['accuracy'], label='Обучающая точность')
+plt.plot(history.history['val_accuracy'], label='Валидационная точность')
+plt.title('Точность модели')
+plt.xlabel('Эпохи')
+plt.ylabel('Точность')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# Получение предсказаний
+predictions = model.predict(x_test)
+
+# Определение класса с максимальной вероятностью для каждого изображения
+predicted_classes = np.argmax(predictions, axis=1)
+
+# Выбор одного изображения из каждого класса
+unique_classes = np.unique(predicted_classes)
+images_per_class = []
+for cls in unique_classes:
+    class_indices = np.where(predicted_classes == cls)[0]
+    if len(class_indices) > 0:
+        images_per_class.append(x_test[class_indices[0]])
+
+# После завершения обучения модели
+model.save('my_model.keras')
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+import os
+
+folder_name = 'Best GA models'
+if not os.path.exists('/content/drive/MyDrive/' + folder_name):
+       os.makedirs('/content/drive/MyDrive/' + folder_name)
+
+model.save('/content/drive/MyDrive/{}/my_model.keras'.format('Best GA models'))
